@@ -1,0 +1,155 @@
+.wrap {
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color 0.18s;
+}
+.wrap:focus-within {
+  border-color: var(--accent);
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-wrap: wrap;
+}
+
+.toolBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.toolBtn:hover { background: var(--bg-hover); color: var(--text); }
+.toolBtnActive { background: var(--accent-dim); color: var(--accent-2); }
+.toolBtnActive:hover { background: var(--accent-dim); color: var(--accent-2); }
+
+.sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ── Link bar ── */
+.linkBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.linkInput {
+  flex: 1;
+  padding: 5px 10px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.linkInput:focus { border-color: var(--accent); }
+.linkApply {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  transition: opacity 0.13s;
+}
+.linkApply:hover { opacity: 0.85; }
+.linkCancel {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  transition: background 0.12s, color 0.12s;
+}
+.linkCancel:hover { background: var(--bg-hover); color: var(--text); }
+
+/* ── Editor area ── */
+.editorWrap {
+  position: relative;
+  min-height: 120px;
+}
+
+/* Placeholder */
+.editorWrap:has(.editor .is-editor-empty)::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  color: var(--text-3);
+  font-size: 13.5px;
+  pointer-events: none;
+}
+
+.editor {
+  outline: none;
+}
+
+/* ProseMirror content area */
+.editor :global(.ProseMirror) {
+  padding: 12px 14px;
+  min-height: 120px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.6;
+  outline: none;
+  font-family: inherit;
+}
+
+.editor :global(.ProseMirror p) {
+  margin: 0 0 6px;
+  min-height: 1.6em;
+}
+.editor :global(.ProseMirror p:last-child) {
+  margin-bottom: 0;
+}
+.editor :global(.ProseMirror strong) {
+  font-weight: 700;
+  color: var(--text);
+}
+.editor :global(.ProseMirror em) {
+  font-style: italic;
+}
+.editor :global(.ProseMirror u) {
+  text-decoration: underline;
+}
+.editor :global(.ProseMirror s) {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+.editor :global(.ProseMirror a) {
+  color: var(--accent-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.editor :global(.ProseMirror ul),
+.editor :global(.ProseMirror ol) {
+  margin: 4px 0 8px;
+  padding-left: 22px;
+}
+.editor :global(.ProseMirror li) {
+  margin-bottom: 3px;
+}
+.editor :global(.ProseMirror li p) {
+  margin: 0;
+}

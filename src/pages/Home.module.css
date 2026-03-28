@@ -1,0 +1,187 @@
+.page {
+  padding: 20px 24px 48px;
+  max-width: 1800px;
+}
+
+/* ── AI Mood section ── */
+.moodSection {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.moodHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.moodHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ai);
+}
+.sparkle { flex-shrink: 0; }
+
+.moodSub {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.moodPills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.moodPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 24px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, transform 0.15s;
+}
+.moodPill:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+.moodPill.moodActive {
+  border-color: var(--mood-color, var(--ai));
+  background: color-mix(in srgb, var(--mood-color, var(--ai)) 12%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--mood-color, var(--ai)) 25%, transparent);
+}
+
+.moodEmoji { font-size: 16px; line-height: 1; }
+
+.moodLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.moodDesc {
+  font-size: 11px;
+  color: var(--text-3);
+  display: none;
+}
+@media (min-width: 600px) { .moodDesc { display: inline; } }
+
+.moodBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mood-color) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mood-color) 30%, transparent);
+  flex-wrap: wrap;
+}
+
+.moodBannerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.moodBannerEmoji { font-size: 24px; line-height: 1; }
+
+.moodBannerTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.moodBannerText {
+  font-size: 12px;
+  color: var(--text-2);
+  max-width: 480px;
+}
+
+.moodClose {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.moodClose:hover { color: var(--text); border-color: var(--border-light); }
+
+/* ── chips ── */
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
+  white-space: nowrap;
+}
+.chip:hover { background: var(--bg-elevated); color: var(--text); }
+.chip.chipActive {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  font-weight: 600;
+}
+
+/* ── loading ── */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 80px 0;
+  color: var(--text-3);
+  font-size: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { animation: spin 0.9s linear infinite; }
+
+/* ── grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px 20px;
+}
+@media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px)  { .grid { grid-template-columns: 1fr; } }
+
+@media (max-width: 640px) {
+  .page { padding: 14px 14px 48px; }
+  .grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+@media (max-width: 480px) {
+  .grid { grid-template-columns: 1fr; }
+}

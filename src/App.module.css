@@ -1,0 +1,19 @@
+.app {
+  min-height: 100vh;
+}
+
+/* Block layout: margin-left naturally shrinks available width */
+.main {
+  margin-top: var(--topbar);
+  margin-left: 0;
+  transition: margin-left 0.22s ease;
+  min-height: calc(100vh - var(--topbar));
+}
+
+.main.shifted {
+  margin-left: var(--sidebar);
+}
+
+@media (max-width: 800px) {
+  .main.shifted { margin-left: 0; }
+}

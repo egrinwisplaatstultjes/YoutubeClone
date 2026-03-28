@@ -1,0 +1,363 @@
+.page {
+  min-height: 100vh;
+  padding: 40px 24px 80px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.inner {
+  width: 100%;
+  max-width: 780px;
+}
+
+.heading {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 28px;
+  letter-spacing: -0.4px;
+}
+
+/* ── Form ──────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Drop zones ────────────────────────────────────── */
+.dropRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dropCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dropZone {
+  position: relative;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  overflow: hidden;
+  padding: 24px;
+  text-align: center;
+}
+.dropZone:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.dropZoneHasFile {
+  border-style: solid;
+  border-color: var(--border);
+  cursor: default;
+}
+.dropZoneHasFile:hover {
+  border-color: var(--border);
+  background: var(--bg-surface);
+}
+.dropZoneWarn {
+  border-color: #f59e0b !important;
+}
+
+/* ── Oversize warning bar ─────────────────────────── */
+.oversizeBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.oversizeIcon { color: #f59e0b; flex-shrink: 0; }
+.oversizeText { flex: 1; color: var(--text-2); font-size: 12.5px; }
+
+.compressBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: #f59e0b;
+  color: #fff;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.compressBtn:hover:not(:disabled) { opacity: 0.85; }
+.compressBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Compression progress bar (video only) */
+.compressProgress {
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.compressProgressFill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+
+.dropIcon {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+.dropLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.dropSub {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* Thumbnail preview */
+.thumbPreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+}
+
+/* Video file info */
+.videoFileInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.videoFileIcon { color: var(--accent); }
+.videoFileName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  word-break: break-all;
+  max-width: 100%;
+}
+.videoFileMeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* Clear button */
+.clearFile {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.clearFile:hover { background: rgba(0,0,0,0.8); }
+
+/* ── Fields ────────────────────────────────────────── */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.req { color: var(--accent-2); }
+
+.input, .textarea, .select {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s;
+}
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--accent);
+}
+.textarea { resize: vertical; }
+.select { cursor: pointer; }
+
+.charCount {
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Mood tags */
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+.tagBtn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  color: var(--text-3);
+  transition: all 0.14s;
+}
+.tagBtn:hover { color: var(--text); border-color: var(--border-soft); }
+.tagBtnOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Progress bars ─────────────────────────────────── */
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progressLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  width: 80px;
+  flex-shrink: 0;
+}
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.2s;
+}
+.progressPct {
+  font-size: 12px;
+  color: var(--text-3);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Error ─────────────────────────────────────────── */
+.error {
+  font-size: 13.5px;
+  color: #f87171;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+/* ── Actions ───────────────────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cancelBtn {
+  padding: 10px 22px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  color: var(--text-2);
+  transition: all 0.14s;
+}
+.cancelBtn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.cancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.submitBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  transition: opacity 0.15s;
+}
+.submitBtn:hover:not(:disabled) { opacity: 0.88; }
+.submitBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .dropRow  { grid-template-columns: 1fr; }
+  .fieldRow { grid-template-columns: 1fr; }
+  .page     { padding: 24px 16px 60px; }
+  .oversizeText { display: none; }
+}
