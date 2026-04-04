@@ -18,6 +18,16 @@ export function formatViews(n) {
   return `${num}`
 }
 
+/**
+ * Returns the best avatar URL for a user.
+ * Google users get their OAuth photo; email users get a generated DiceBear avatar.
+ */
+export function getAvatarUrl(user) {
+  if (!user) return null
+  if (user.user_metadata?.avatar_url) return user.user_metadata.avatar_url
+  return `https://api.dicebear.com/9.x/lorelei/svg?seed=${user.id}`
+}
+
 /** Maps a raw Supabase videos row → the shape all components expect. */
 export function mapVideo(row) {
   return {
@@ -39,5 +49,7 @@ export function mapVideo(row) {
     description: row.description,
     isOwn:       row.is_own ?? false,
     userId:      row.user_id ?? null,
+    isLive:      row.is_live  ?? false,
+    isShort:     row.is_short ?? false,
   }
 }

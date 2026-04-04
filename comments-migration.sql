@@ -7,10 +7,10 @@ alter table comments add column if not exists parent_id uuid references comments
 create table if not exists comment_votes (
   id         uuid primary key default gen_random_uuid(),
   comment_id uuid not null references comments(id) on delete cascade,
-  session_id text not null,
+  user_id    text not null,
   vote       text not null check (vote in ('up', 'down')),
   created_at timestamptz default now(),
-  unique (comment_id, session_id)
+  unique (comment_id, user_id)
 );
 
 alter table comment_votes enable row level security;

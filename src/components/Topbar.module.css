@@ -23,13 +23,19 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 16.5px;
-  font-weight: 800;
-  letter-spacing: -0.4px;
-  color: var(--text);
+  gap: 9px;
+  text-decoration: none;
 }
-.logoIcon { color: var(--accent); }
+
+.logoText {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 50%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
 .search {
   flex: 1;
@@ -285,3 +291,182 @@
   text-align: left;
 }
 .menuItem:hover { background: var(--bg-hover); color: var(--text); }
+
+.iconActive { background: var(--bg-elevated); color: var(--text); }
+
+/* ── Notifications ── */
+.notifWrap {
+  position: relative;
+}
+
+.notifPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 300px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  z-index: 500;
+  animation: fadeIn 0.15s ease;
+}
+
+.notifHeader {
+  padding: 14px 16px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.notifEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 16px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.notifEmptyIcon { opacity: 0.3; }
+
+/* ── Return to live stream pill ── */
+.returnLiveBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 20px;
+  border: 1.5px solid #ef4444;
+  color: #ef4444;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(239,68,68,0.08);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.returnLiveBtn:hover { background: #ef4444; color: #fff; }
+.returnLiveBtn:hover .returnLiveDot { background: #fff; }
+
+.returnLiveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+.returnLiveBtn:hover .returnLiveDot { animation: none; }
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+
+
+/* Avatar area — always visible, never hidden by search overlay */
+.avatarArea {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 301; /* always above the mobile search overlay (z-index 300) */
+}
+
+/* Search toggle — mobile only (hidden on desktop) */
+.searchToggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  transition: background 0.14s, color 0.14s;
+  flex-shrink: 0;
+}
+.searchToggle:hover { background: var(--bg-elevated); color: var(--text); }
+
+/* Back/close button inside search — mobile only */
+.searchBack {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+  transition: background 0.14s, color 0.14s;
+}
+.searchBack:hover { background: var(--bg-elevated); color: var(--text); }
+
+/* ── Tablet (≤ 960px) ── */
+@media (max-width: 960px) {
+  .left { min-width: 160px; }
+  .search { max-width: 400px; }
+}
+
+/* ── Small tablet (≤ 780px) ── */
+@media (max-width: 780px) {
+  .left { min-width: 0; }
+  .micBtn    { display: none; }
+  .search { max-width: 320px; }
+}
+
+/* ── Mobile (≤ 600px) ── */
+@media (max-width: 600px) {
+  .bar { padding: 0 10px; gap: 8px; }
+
+  /* Hide the search bar by default on mobile */
+  .search {
+    display: none;
+    flex: 1;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  /* Full-width overlay when search is open on mobile */
+  .search.searchMobileOpen {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    padding: 0 10px;
+    background: var(--bg);
+    z-index: 300;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* Show back arrow inside mobile search */
+  .searchBack { display: flex; }
+
+  /* The search input + button take remaining width */
+  .search.searchMobileOpen .searchInner { flex: 1; }
+
+  /* Show the search icon toggle in the action bar */
+  .searchToggle { display: flex; }
+
+  /* Utility: hide left/right when search overlay is open */
+  .hiddenOnMobile { display: none !important; }
+
+  /* Hide notifications on mobile (accessible via avatar menu) */
+  .hideOnSmall { display: none !important; }
+
+  /* Push right icons + avatar to the far right when search is hidden */
+  .right { margin-left: auto; }
+
+  /* Smaller logo */
+  .logoText { font-size: 17px; }
+  .left { gap: 8px; }
+
+  /* Sign in button — compact */
+  .signInBtn { padding: 6px 12px; font-size: 12px; }
+}
+

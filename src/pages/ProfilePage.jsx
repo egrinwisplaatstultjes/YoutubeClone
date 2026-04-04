@@ -3,19 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Eye, History, Sparkles, Upload, LogIn, Loader2,
   Settings, LogOut, TrendingUp, Lightbulb, Award, BarChart2,
-  MoreVertical, Pencil, Archive, RotateCcw, Trash2,
+  MoreVertical, Pencil, Archive, RotateCcw, Trash2, User, SlidersHorizontal,
 } from 'lucide-react'
 import { fetchMyVideos, fetchWatchHistory, fetchArchivedVideos, archiveVideo, restoreVideo, deleteVideo } from '../lib/db'
-import { formatViews } from '../lib/utils'
+import { formatViews, getAvatarUrl } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
 import VideoCard from '../components/VideoCard'
 import styles from './ProfilePage.module.css'
 
 const TABS = [
-  { id: 'videos',   label: 'Videos' },
-  { id: 'archived', label: 'Archived' },
-  { id: 'history',  label: 'History' },
-  { id: 'insights', label: 'AI Insights' },
+  { id: 'videos',      label: 'Videos' },
+  { id: 'archived',    label: 'Archived' },
+  { id: 'history',     label: 'History' },
+  { id: 'insights',    label: 'Nova Insights' },
+  { id: 'preferences', label: 'Preferences' },
 ]
 
 // Derive AI insights from the user's actual video data
@@ -54,7 +55,7 @@ function buildInsights(videos) {
 }
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, updateProfile } = useAuth()
   const navigate = useNavigate()
 
   const [tab,             setTab]             = useState('videos')
@@ -70,6 +71,7 @@ export default function ProfilePage() {
   const menuRef     = useRef(null)
   const [showSettings, setShowSettings] = useState(false)
   const settingsRef = useRef(null)
+  const [savingPref, setSavingPref] = useState(null)
 
   useEffect(() => {
     if (!user) { setLoading(false); return }
@@ -146,6 +148,17 @@ export default function ProfilePage() {
     }
   }
 
+  async function togglePref(key) {
+    if (savingPref) return
+    setSavingPref(key)
+    try {
+      const current = user.user_metadata?.[key] !== false
+      await updateProfile({ [key]: !current })
+    } finally {
+      setSavingPref(null)
+    }
+  }
+
   if (!user) {
     return (
       <div className={styles.page}>
@@ -159,7 +172,9 @@ export default function ProfilePage() {
   }
 
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Your Channel'
-  const avatarUrl   = user.user_metadata?.avatar_url
+  const avatarUrl   = getAvatarUrl(user)
+  const bannerUrl   = user.user_metadata?.banner_url || `https://picsum.photos/seed/${user.id}/1600/280`
+  const bio         = user.user_metadata?.bio || ''
   const handle      = '@' + (user.email?.split('@')[0] ?? 'you').toLowerCase().replace(/[^a-z0-9]/g, '')
   const joinedDate  = new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   const totalViews  = videos.reduce((s, v) => s + (Number(v.views) || 0), 0)
@@ -171,7 +186,7 @@ export default function ProfilePage() {
 
       {/* Banner */}
       <div className={styles.banner}>
-        <img src={`https://picsum.photos/seed/${user.id}/1600/280`} alt="" />
+        <img src={bannerUrl} alt="" />
         <div className={styles.bannerGrad} />
         <button className={styles.editBanner} onClick={() => navigate('/upload')}>
           <Upload size={13} /> Upload video
@@ -182,10 +197,7 @@ export default function ProfilePage() {
       <div className={styles.channelHead}>
         <div className={styles.headInner}>
           <div className={styles.avatarCol}>
-            {avatarUrl
-              ? <img src={avatarUrl} alt={displayName} className={styles.avatar} referrerPolicy="no-referrer" />
-              : <div className={styles.avatarFallback}>{initials}</div>
-            }
+            <img src={avatarUrl} alt={displayName} className={styles.avatar} referrerPolicy="no-referrer" />
           </div>
 
           <div className={styles.headInfo}>
@@ -193,6 +205,7 @@ export default function ProfilePage() {
               <h1 className={styles.name}>{displayName}</h1>
             </div>
             <p className={styles.handle}>{handle}</p>
+            {bio && <p className={styles.bio}>{bio}</p>}
             <div className={styles.statsInline}>
               <span><strong>{videos.length}</strong> video{videos.length !== 1 ? 's' : ''}</span>
               <span className={styles.dot}>·</span>
@@ -222,6 +235,25 @@ export default function ProfilePage() {
                     <div className={styles.settingsDivider} />
                     <button
                       className={styles.settingsItem}
+                      onClick={() => { setShowSettings(false); navigate('/settings') }}
+                    >
+                      <SlidersHorizontal size={14} /> Edit profile
+                    </button>
+                    <button
+                      className={styles.settingsItem}
+                      onClick={() => { setShowSettings(false); navigate(`/channel/${user.id}`) }}
+                    >
+                      <User size={14} /> Your channel
+                    </button>
+                    <button
+                      className={styles.settingsItem}
+                      onClick={() => { setShowSettings(false); navigate('/upload') }}
+                    >
+                      <Upload size={14} /> Upload video
+                    </button>
+                    <div className={styles.settingsDivider} />
+                    <button
+                      className={`${styles.settingsItem} ${styles.settingsItemDanger}`}
                       onClick={() => { setShowSettings(false); signOut() }}
                     >
                       <LogOut size={14} /> Sign out
@@ -401,7 +433,7 @@ export default function ProfilePage() {
           )
         )}
 
-        {/* AI Insights tab */}
+        {/* Nova Insights tab */}
         {tab === 'insights' && (
           loading ? (
             <div className={styles.empty}>
@@ -411,7 +443,7 @@ export default function ProfilePage() {
             <div className={styles.empty}>
               <Sparkles size={36} className={styles.emptyIcon} />
               <p className={styles.emptyTitle}>Upload your first video to unlock AI insights</p>
-              <p className={styles.emptySub}>Once you have videos, Wavr AI will analyze your channel performance.</p>
+              <p className={styles.emptySub}>Once you have videos, Nova will analyze your channel performance.</p>
               <button className={styles.subBtn} onClick={() => navigate('/upload')}>Upload a video</button>
             </div>
           ) : (
@@ -486,7 +518,7 @@ export default function ProfilePage() {
               <div className={styles.insightCard}>
                 <div className={styles.insightCardTop}>
                   <Lightbulb size={18} className={styles.insightIcon} />
-                  <span className={styles.insightLabel}>AI Tip · Upload</span>
+                  <span className={styles.insightLabel}>Nova Tip · Upload</span>
                 </div>
                 <p className={styles.insightTip}>{insights.uploadTip}</p>
               </div>
@@ -495,13 +527,55 @@ export default function ProfilePage() {
               <div className={styles.insightCard}>
                 <div className={styles.insightCardTop}>
                   <Sparkles size={18} className={styles.insightIcon} />
-                  <span className={styles.insightLabel}>AI Tip · Growth</span>
+                  <span className={styles.insightLabel}>Nova Tip · Growth</span>
                 </div>
                 <p className={styles.insightTip}>{insights.viewTip}</p>
               </div>
 
             </div>
           )
+        )}
+
+        {/* Preferences tab */}
+        {tab === 'preferences' && (
+          <div className={styles.prefSection}>
+            <h2 className={styles.prefHeading}>App Preferences</h2>
+            <p className={styles.prefSub}>These settings are saved to your account and apply everywhere you're signed in.</p>
+
+            <div className={styles.prefList}>
+
+              <div className={styles.prefRow}>
+                <div className={styles.prefInfo}>
+                  <span className={styles.prefLabel}>AI Features</span>
+                  <span className={styles.prefDesc}>Show the Nova Daily Brief and Nova Mood Feed on the home page.</span>
+                </div>
+                <button
+                  className={`${styles.toggle} ${user.user_metadata?.pref_ai_features !== false ? styles.toggleOn : ''}`}
+                  onClick={() => togglePref('pref_ai_features')}
+                  disabled={savingPref === 'pref_ai_features'}
+                  aria-label="Toggle AI features"
+                >
+                  <span className={styles.toggleThumb} />
+                </button>
+              </div>
+
+              <div className={styles.prefRow}>
+                <div className={styles.prefInfo}>
+                  <span className={styles.prefLabel}>Mini Player</span>
+                  <span className={styles.prefDesc}>Keep a floating video player in the bottom-right corner when you navigate away from a video.</span>
+                </div>
+                <button
+                  className={`${styles.toggle} ${user.user_metadata?.pref_mini_player !== false ? styles.toggleOn : ''}`}
+                  onClick={() => togglePref('pref_mini_player')}
+                  disabled={savingPref === 'pref_mini_player'}
+                  aria-label="Toggle mini player"
+                >
+                  <span className={styles.toggleThumb} />
+                </button>
+              </div>
+
+            </div>
+          </div>
         )}
       </div>
     </div>

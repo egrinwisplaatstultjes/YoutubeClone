@@ -37,9 +37,9 @@ create policy "Public videos delete" on videos for delete using (true);
 -- ── Likes ────────────────────────────────────────────────────────────────────
 create table if not exists likes (
   video_id   text not null,
-  session_id text not null,
+  user_id    text not null,
   created_at timestamptz default now(),
-  primary key (video_id, session_id)
+  primary key (video_id, user_id)
 );
 
 grant select, insert, delete on likes to anon, authenticated;

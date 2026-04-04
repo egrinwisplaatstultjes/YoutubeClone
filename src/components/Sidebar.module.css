@@ -15,6 +15,16 @@
 .closed { transform: translateX(-100%); }
 .open   { transform: translateX(0); }
 
+@media (max-width: 600px) {
+  .sidebar {
+    /* Float above the overlay on mobile */
+    z-index: 100;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    /* Slightly narrower on small screens */
+    width: min(var(--sidebar), 82vw);
+  }
+}
+
 .group {
   display: flex;
   flex-direction: column;

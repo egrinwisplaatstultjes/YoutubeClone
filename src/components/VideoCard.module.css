@@ -65,7 +65,7 @@
   backdrop-filter: blur(4px);
 }
 .live {
-  background: var(--red);
+  background: #7c3aed;
   animation: livePulse 2s ease infinite;
 }
 @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.72} }
@@ -95,6 +95,8 @@
 }
 
 .avatarLink { flex-shrink: 0; }
+.titleLink  { text-decoration: none; color: inherit; display: block; }
+.channelLink { text-decoration: none; color: inherit; display: block; }
 .avatar {
   width: 38px;
   height: 38px;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Radio, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { X, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import VeloraLogo from './VeloraLogo'
 import styles from './AuthModal.module.css'
 
 export default function AuthModal({ onClose }) {
@@ -65,8 +66,8 @@ export default function AuthModal({ onClose }) {
         </button>
 
         <div className={styles.header}>
-          <Radio size={22} className={styles.logo} />
-          <h2 className={styles.title}>Sign in to Wavr</h2>
+          <div className={styles.logo}><VeloraLogo size={40} /></div>
+          <h2 className={styles.title}>Sign in to Velora</h2>
           <p className={styles.sub}>
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}
           </p>

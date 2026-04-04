@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Upload, ImagePlus, Video, X, Loader2, CheckCircle2, AlertTriangle, Minimize2 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Upload, ImagePlus, Video, X, Loader2, CheckCircle2, AlertTriangle, Minimize2, Zap } from 'lucide-react'
 import { createVideo, uploadFile } from '../lib/db'
 import { categories } from '../data/mockData'
 import RichEditor from '../components/RichEditor'
@@ -8,7 +8,7 @@ import styles from './UploadPage.module.css'
 
 const THUMB_MAX_MB    = 50
 const THUMB_MAX_BYTES = THUMB_MAX_MB * 1024 * 1024
-const VIDEO_MAX_MB    = 2048  // 2 GB — raise your Supabase bucket limit to match
+const VIDEO_MAX_MB    = 50
 const VIDEO_MAX_BYTES = VIDEO_MAX_MB * 1024 * 1024
 
 const MOOD_TAGS = ['chill', 'focused', 'curious', 'energized', 'hype']
@@ -44,9 +44,13 @@ async function compressImage(file) {
   })
 }
 
+const SHORT_MAX_SECONDS = 60
+
 export default function UploadPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
+  const [isShort,     setIsShort]     = useState(searchParams.get('short') === '1')
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
   const [category,    setCategory]    = useState('Tech')
@@ -57,9 +61,11 @@ export default function UploadPage() {
   const [thumbOversize,   setThumbOversize]   = useState(false)
   const [compressingThumb, setCompressingThumb] = useState(false)
 
-  const [videoFile,     setVideoFile]     = useState(null)
-  const [duration,      setDuration]      = useState('')
-  const [videoOversize, setVideoOversize] = useState(false)
+  const [videoFile,        setVideoFile]        = useState(null)
+  const [duration,         setDuration]         = useState('')
+  const [durationSeconds,  setDurationSeconds]  = useState(null)
+  const [videoOversize,    setVideoOversize]    = useState(false)
+  const [videoTooLong,     setVideoTooLong]     = useState(false)
 
   const [thumbProgress, setThumbProgress] = useState(0)
   const [videoProgress, setVideoProgress] = useState(0)
@@ -80,12 +86,24 @@ export default function UploadPage() {
   function onVideoChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.type !== 'video/mp4') {
+      setError('Only MP4 files are supported.')
+      e.target.value = ''
+      return
+    }
+    setError('')
     setVideoFile(file)
     setVideoOversize(file.size > VIDEO_MAX_BYTES)
     const url = URL.createObjectURL(file)
     const vid  = document.createElement('video')
     vid.preload = 'metadata'
-    vid.onloadedmetadata = () => { setDuration(formatDuration(vid.duration)); URL.revokeObjectURL(url) }
+    vid.onloadedmetadata = () => {
+      const secs = Math.floor(vid.duration)
+      setDuration(formatDuration(vid.duration))
+      setDurationSeconds(secs)
+      setVideoTooLong(isShort && secs > SHORT_MAX_SECONDS)
+      URL.revokeObjectURL(url)
+    }
     vid.src = url
   }
 
@@ -115,7 +133,8 @@ export default function UploadPage() {
     if (!videoFile)     { setError('Please select a video file.'); return }
     if (!thumbFile)     { setError('Please select a thumbnail image.'); return }
     if (thumbOversize)  { setError('Please compress your thumbnail first.'); return }
-    if (videoOversize)  { setError(`Video exceeds the ${VIDEO_MAX_MB / 1024} GB limit.`); return }
+    if (videoOversize)  { setError(`Video exceeds the ${VIDEO_MAX_MB} MB limit.`); return }
+    if (videoTooLong)   { setError(`Shorts must be ${SHORT_MAX_SECONDS} seconds or less.`); return }
 
     setError('')
     setStatus('uploading')
@@ -138,17 +157,19 @@ export default function UploadPage() {
       )
 
       const video = await createVideo({
-        title:       title.trim(),
-        description: description.trim(),
+        title:           title.trim(),
+        description:     description.trim(),
         category,
         tags,
-        thumbnail:   thumbUrl,
+        thumbnail:       thumbUrl,
         videoUrl,
-        duration:    duration || '0:00',
+        duration:        duration || '0:00',
+        durationSeconds: durationSeconds ?? null,
+        isShort,
       })
 
       setStatus('done')
-      setTimeout(() => navigate(`/watch/${video.id}`), 1200)
+      setTimeout(() => navigate(isShort ? '/shorts' : `/watch/${video.id}`), 1200)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Upload failed. Please try again.')
@@ -162,7 +183,26 @@ export default function UploadPage() {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        <h1 className={styles.heading}>Upload a video</h1>
+        <div className={styles.headingRow}>
+          <h1 className={styles.heading}>{isShort ? 'Upload a Short' : 'Upload a video'}</h1>
+          <button
+            type="button"
+            className={`${styles.shortToggle} ${isShort ? styles.shortToggleOn : ''}`}
+            onClick={() => {
+              setIsShort(s => !s)
+              if (durationSeconds !== null) setVideoTooLong(!isShort && durationSeconds > SHORT_MAX_SECONDS)
+            }}
+          >
+            <Zap size={14} />
+            {isShort ? 'Short (≤60s)' : 'Make it a Short'}
+          </button>
+        </div>
+
+        {isShort && (
+          <p className={styles.shortHint}>
+            Shorts are vertical videos up to 60 seconds. They appear in the Shorts feed.
+          </p>
+        )}
 
         <form className={styles.form} onSubmit={handleSubmit}>
 
@@ -234,7 +274,7 @@ export default function UploadPage() {
                     <button
                       type="button"
                       className={styles.clearFile}
-                      onClick={e => { e.stopPropagation(); setVideoFile(null); setDuration(''); setVideoOversize(false) }}
+                      onClick={e => { e.stopPropagation(); setVideoFile(null); setDuration(''); setDurationSeconds(null); setVideoOversize(false); setVideoTooLong(false) }}
                     >
                       <X size={14} />
                     </button>
@@ -243,17 +283,25 @@ export default function UploadPage() {
                   <>
                     <Upload size={28} className={styles.dropIcon} />
                     <p className={styles.dropLabel}>Video file</p>
-                    <p className={styles.dropSub}>MP4, MOV, WebM · max 2 GB</p>
+                    <p className={styles.dropSub}>MP4 only · max {VIDEO_MAX_MB} MB</p>
                   </>
                 )}
-                <input ref={videoInputRef} type="file" accept="video/*" className={styles.hiddenInput} onChange={onVideoChange} />
+                <input ref={videoInputRef} type="file" accept="video/mp4" className={styles.hiddenInput} onChange={onVideoChange} />
               </div>
 
               {videoOversize && (
                 <div className={styles.oversizeBar}>
                   <AlertTriangle size={14} className={styles.oversizeIcon} />
                   <span className={styles.oversizeText}>
-                    {(videoFile.size / 1024 / 1024 / 1024).toFixed(2)} GB — exceeds 2 GB limit
+                    {(videoFile.size / 1024 / 1024).toFixed(1)} MB — exceeds {VIDEO_MAX_MB} MB limit
+                  </span>
+                </div>
+              )}
+              {videoTooLong && (
+                <div className={styles.oversizeBar}>
+                  <AlertTriangle size={14} className={styles.oversizeIcon} />
+                  <span className={styles.oversizeText}>
+                    {duration} — Shorts must be {SHORT_MAX_SECONDS}s or less
                   </span>
                 </div>
               )}
@@ -336,7 +384,7 @@ export default function UploadPage() {
             <button
               type="submit"
               className={styles.submitBtn}
-              disabled={uploading || done || compressingThumb || thumbOversize || videoOversize}
+              disabled={uploading || done || compressingThumb || thumbOversize || videoOversize || videoTooLong}
             >
               {done ? (
                 <><CheckCircle2 size={15} /> Published!</>

@@ -1,14 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Sparkles, X, Loader2 } from 'lucide-react'
+import { Sparkles, X, Loader2, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { categories, moods, getAiMatches } from '../data/mockData'
-import { fetchVideos, getCachedVideos } from '../lib/db'
+import { fetchVideos, getCachedVideos, fetchShorts } from '../lib/db'
+import { useAuth } from '../context/AuthContext'
 import VideoCard from '../components/VideoCard'
 import AiDigest from '../components/AiDigest'
 import styles from './Home.module.css'
 
 export default function Home() {
+  const { user } = useAuth()
+  const aiEnabled = !!user && user?.user_metadata?.pref_ai_features !== false
+
   const [videos,  setVideos]  = useState(() => getCachedVideos() ?? [])
   const [loading, setLoading] = useState(() => !getCachedVideos())
+  const [shorts,  setShorts]  = useState([])
   const [category,    setCategory]    = useState('All')
   const [activeMood,  setActiveMood]  = useState(null)
   const currentMood = moods.find(m => m.id === activeMood)
@@ -17,6 +23,7 @@ export default function Home() {
     fetchVideos()
       .then(setVideos)
       .finally(() => setLoading(false))
+    fetchShorts().then(setShorts).catch(() => {})
   }, [])
 
   const aiMatches = useMemo(() => getAiMatches(videos, activeMood), [videos, activeMood])
@@ -32,14 +39,14 @@ export default function Home() {
   return (
     <div className={styles.page}>
 
-      <AiDigest videos={videos} />
+      {aiEnabled && <AiDigest videos={videos} />}
 
-      {/* AI Mood Feed */}
-      <div className={styles.moodSection}>
+      {/* Nova Mood Feed */}
+      {aiEnabled && <div className={styles.moodSection}>
         <div className={styles.moodHeader}>
           <div className={styles.moodHeading}>
             <Sparkles size={15} className={styles.sparkle} />
-            <span>AI Mood Feed</span>
+            <span>Nova Mood Feed</span>
           </div>
           <p className={styles.moodSub}>Tell us your vibe — we'll sort your feed around it</p>
         </div>
@@ -75,7 +82,7 @@ export default function Home() {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Category chips */}
       <div className={styles.chips}>
@@ -107,6 +114,32 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      {/* Shorts row — below main grid */}
+      <div className={styles.shortsSection}>
+        <div className={styles.shortsSectionHeader}>
+          <span className={styles.shortsSectionTitle}>Shorts</span>
+          <Link to="/shorts" className={styles.shortsSeeAll}>
+            See all <ChevronRight size={14} />
+          </Link>
+        </div>
+        <div className={styles.shortsRow}>
+          {shorts.slice(0, 5).map(s => (
+            <Link key={s.id} to={`/shorts/${s.id}`} className={styles.shortCard}>
+              <div className={styles.shortThumbWrap}>
+                <img
+                  src={s.thumbnail}
+                  alt={s.title}
+                  className={styles.shortThumb}
+                />
+                <span className={styles.shortDuration}>{s.duration}</span>
+              </div>
+              <p className={styles.shortTitle}>{s.title}</p>
+              <p className={styles.shortMeta}>@{s.channel.replace(/\s+/g, '').toLowerCase()}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

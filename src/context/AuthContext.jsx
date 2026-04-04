@@ -4,8 +4,9 @@ import { supabase } from '../lib/supabase'
 const Ctx = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user,          setUser]          = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   useEffect(() => {
     // Restore session on page load
@@ -39,12 +40,22 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
+  async function updateProfile(updates) {
+    const { data, error } = await supabase.auth.updateUser({ data: updates })
+    if (error) throw error
+    setUser(data.user)
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
 
   return (
-    <Ctx.Provider value={{ user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
+    <Ctx.Provider value={{
+      user, loading,
+      signInWithGoogle, signInWithEmail, signUpWithEmail, updateProfile, signOut,
+      showAuthModal, openAuthModal: () => setShowAuthModal(true), closeAuthModal: () => setShowAuthModal(false),
+    }}>
       {children}
     </Ctx.Provider>
   )

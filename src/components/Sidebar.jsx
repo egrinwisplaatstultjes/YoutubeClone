@@ -1,75 +1,70 @@
-import { useState, useEffect } from 'react'
-import { Home, Compass, TrendingUp, History, PlaySquare, Clock, ThumbsUp } from 'lucide-react'
+import { Home, Clapperboard } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { fetchSubscriptions } from '../lib/db'
+import { useState, useEffect } from 'react'
+import { fetchSubscriptions, fetchLiveChannelIds } from '../lib/db'
+import { useAuth } from '../context/AuthContext'
 import styles from './Sidebar.module.css'
 
-const mainNav = [
-  { icon: Home,       label: 'Home',        path: '/' },
-  { icon: Compass,    label: 'Explore',     path: '/explore' },
-  { icon: TrendingUp, label: 'Trending',    path: '/trending' },
+const nav = [
+  { icon: Home,         label: 'Home',   path: '/' },
+  { icon: Clapperboard, label: 'Shorts', path: '/shorts' },
 ]
-
-const youNav = [
-  { icon: History,    label: 'History',     path: '/history' },
-  { icon: PlaySquare, label: 'Your videos', path: '/profile' },
-  { icon: Clock,      label: 'Watch later', path: '/later' },
-  { icon: ThumbsUp,   label: 'Liked',       path: '/liked' },
-]
-
-function Item({ icon: Icon, label, path, location }) {
-  const active = location.pathname === path
-  return (
-    <Link to={path} className={`${styles.item} ${active ? styles.active : ''}`}>
-      <Icon size={19} />
-      <span>{label}</span>
-    </Link>
-  )
-}
 
 export default function Sidebar({ open }) {
   const location = useLocation()
-  const [subs, setSubs] = useState([])
+  const { user } = useAuth()
+  const [subs,    setSubs]    = useState([])
+  const [liveIds, setLiveIds] = useState(new Set())
 
   useEffect(() => {
-    fetchSubscriptions().then(setSubs).catch(() => {})
-  }, [location.pathname]) // re-fetch when navigating so new subs appear
+    if (!user) { setSubs([]); return }
+    const load = () => {
+      fetchSubscriptions().then(setSubs).catch(() => {})
+      fetchLiveChannelIds().then(setLiveIds).catch(() => {})
+    }
+    load()
+    window.addEventListener('velora:subs-changed', load)
+    return () => window.removeEventListener('velora:subs-changed', load)
+  }, [user?.id])
 
   return (
     <aside className={`${styles.sidebar} ${open ? styles.open : styles.closed}`}>
-
       <div className={styles.group}>
-        {mainNav.map(n => <Item key={n.path} {...n} location={location} />)}
-      </div>
-
-      <div className={styles.sep} />
-      <div className={styles.label}>You</div>
-      <div className={styles.group}>
-        {youNav.map(n => <Item key={n.path} {...n} location={location} />)}
+        {nav.map(({ icon: Icon, label, path }) => (
+          <Link key={path} to={path} className={`${styles.item} ${location.pathname === path ? styles.active : ''}`}>
+            <Icon size={19} />
+            <span>{label}</span>
+          </Link>
+        ))}
       </div>
 
       {subs.length > 0 && (
         <>
           <div className={styles.sep} />
-          <div className={styles.label}>Subscriptions</div>
+          <p className={styles.label}>Subscriptions</p>
           <div className={styles.group}>
-            {subs.map(ch => (
-              <Link key={ch.channel_id} to={`/channel/${ch.channel_id}`} className={styles.subItem}>
+            {subs.map(s => (
+              <Link
+                key={s.channel_id}
+                to={`/channel/${s.channel_id}`}
+                className={styles.subItem}
+              >
                 <div className={styles.subImgWrap}>
-                  {ch.channel_avatar
-                    ? <img src={ch.channel_avatar} alt={ch.channel_name} />
-                    : <div className={styles.subImgFallback}>
-                        {ch.channel_name.slice(0, 1).toUpperCase()}
-                      </div>
+                  {s.channel_avatar
+                    ? <img src={s.channel_avatar} alt={s.channel_name} referrerPolicy="no-referrer" />
+                    : <div className={styles.subImgFallback}>{(s.channel_name?.[0] ?? '?').toUpperCase()}</div>
                   }
+                  {liveIds.has(s.channel_id) && <span className={styles.liveDot} />}
                 </div>
-                <span className={styles.subName}>{ch.channel_name}</span>
+                <span className={styles.subName}>{s.channel_name}</span>
+                {liveIds.has(s.channel_id) && (
+                  <span className={styles.liveTag}>LIVE</span>
+                )}
               </Link>
             ))}
           </div>
         </>
       )}
-
     </aside>
   )
 }

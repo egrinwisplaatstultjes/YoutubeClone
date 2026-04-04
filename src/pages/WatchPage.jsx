@@ -1,7 +1,8 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ThumbsUp, ThumbsDown, Share2, Bookmark, MoreHorizontal,
-  BadgeCheck, Send, Loader2, ChevronDown, Flag, Trash2,
+  BadgeCheck, Send, Loader2, ChevronDown, Flag, Trash2, Radio, Users,
+  Play, Pause, Volume1, Volume2, VolumeX, Settings, Maximize, Minimize,
 } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import DOMPurify from 'dompurify'
@@ -9,11 +10,14 @@ import {
   fetchVideo, fetchVideos, fetchLikes, toggleLike, fetchDislike, toggleDislike,
   fetchComments, fetchReplies, postComment, postReply, voteComment,
   incrementViews, isSubscribed, subscribe, unsubscribe, reportVideo, fetchReported, deleteVideo,
+  fetchLiveChatMessages, fetchSubscriberCount,
 } from '../lib/db'
-import { timeAgo, formatViews } from '../lib/utils'
+import { connectToStream } from '../lib/liveStream'
+import { timeAgo, formatViews, getAvatarUrl } from '../lib/utils'
 import { usePlayer } from '../context/PlayerContext'
 import { useAuth } from '../context/AuthContext'
 import VideoCard from '../components/VideoCard'
+import LivePlayer from '../components/LivePlayer'
 import styles from './WatchPage.module.css'
 
 function applyVoteChange(item, vote, currentVote, newVote) {
@@ -33,58 +37,231 @@ function applyVoteChange(item, vote, currentVote, newVote) {
 
 export default function WatchPage() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, openAuthModal } = useAuth()
+  const navigate = useNavigate()
   const [video,       setVideo]       = useState(null)
   const [related,     setRelated]     = useState([])
   const [pageLoading, setPageLoading] = useState(true)
 
   const player       = usePlayer()
   const containerRef = useRef(null)
+  const playerOuterRef = useRef(null)
+
+  // ── Live state ────────────────────────────────────────────────────────────
+  const [isLive,         setIsLive]         = useState(false)
+  const [liveStream,     setLiveStream]     = useState(null)
+  const [liveMessages,   setLiveMessages]   = useState([])
+  const [liveChatInput,  setLiveChatInput]  = useState('')
+  const [liveChatLoading,setLiveChatLoading]= useState(false)
+  const [liveViewerCount,setLiveViewerCount]= useState(0)
+  const [streamEnded,    setStreamEnded]    = useState(false)
+  const liveConnectionRef = useRef(null)
+
+  // ── VOD custom player controls state ─────────────────────────────────────
+  const [vodPaused,      setVodPaused]      = useState(false)
+  const [vodMuted,       setVodMuted]       = useState(false)
+  const [vodVolume,      setVodVolume]      = useState(1)
+  const [vodShowVol,     setVodShowVol]     = useState(false)
+  const [vodDuration,    setVodDuration]    = useState(0)
+  const [vodShowCtrl,    setVodShowCtrl]    = useState(false)
+  const [vodSettingsOpen,setVodSettingsOpen]= useState(false)
+  const [vodSpeed,       setVodSpeed]       = useState(1)
+  const [vodFullscreen,  setVodFullscreen]  = useState(false)
+  const [vodPreview,     setVodPreview]     = useState(null) // { x, time, frame }
+  const vodHideTimer       = useRef(null)
+  const vodBarRef          = useRef(null)
+  const vodTimeLabelRef    = useRef(null)
+  const vodPreviewTimer    = useRef(null)
+  const vodPreviewCloneRef = useRef(null)  // persistent clone — created once, reused
+  const liveChatEndRef      = useRef(null)
+  const liveChatMessagesRef = useRef(null)
 
   useEffect(() => {
-    return () => { player.detach(); player.showMini() }
+    return () => {
+      player.detach()
+      // Destroy preview clone
+      const c = vodPreviewCloneRef.current
+      if (c) { c.onloadedmetadata = null; c.onseeked = null; c.onerror = null; c.removeAttribute('src'); c.load() }
+    }
   }, [])
+
+  // Reset all live state + stop everything whenever navigating to a different video
+  useEffect(() => {
+    // Stop the regular video player
+    player.detach()
+    // Kill any existing live connection
+    if (liveConnectionRef.current) {
+      liveConnectionRef.current.cleanup()
+    }
+    setIsLive(false)
+    setLiveStream(null)
+    setStreamEnded(false)
+    setLiveMessages([])
+    setLiveViewerCount(0)
+    setLiveChatInput('')
+    setLiveChatLoading(false)
+    liveConnectionRef.current = null
+  }, [id])
 
   useEffect(() => {
     setPageLoading(true)
-    Promise.all([fetchVideo(id), fetchVideos()]).then(async ([v, all]) => {
-      const isOwn = !!(user && v.channelId === user.id)
-      const [{ count, liked }, disliked, alreadyReported, subbed] = await Promise.all([
-        fetchLikes(v.id),
-        fetchDislike(v.id),
-        fetchReported(v.id),
-        isOwn ? Promise.resolve(false) : isSubscribed(v.channelId),
+    const isOwn = !!(user && id) // optimistic — refined after video loads
+    Promise.all([
+      fetchVideo(id),
+      fetchVideos(),
+      fetchLikes(id),
+      fetchDislike(id),
+      fetchReported(id),
+      user ? isSubscribed(id) : Promise.resolve(false), // channelId filled below
+      fetchSubscriberCount(id), // real sub count — keyed on video id first, corrected below
+    ]).then(async ([v, all, likesData, disliked, alreadyReported, _subbed, _subCount]) => {
+      const own = !!(user && v.channelId === user.id)
+      // Re-fetch sub data with the real channelId now that we have the video
+      const [{ count, liked }, subbed, subCount] = await Promise.all([
+        Promise.resolve(likesData),
+        own ? Promise.resolve(false) : isSubscribed(v.channelId),
+        fetchSubscriberCount(v.channelId),
       ])
-      setVideo(v)
+      setVideo({ ...v, subscribers: subCount.toLocaleString() })
+      setIsLive(v.isLive)
       setRelated(all.filter(x => x.id !== id).slice(0, 6))
       setLikeCount(count)
       setLiked(liked)
       setDisliked(disliked)
       setReported(alreadyReported)
       setSubscribed(subbed)
-      player.setVideo(v)
-      player.hideMini()
+      if (!v.isLive) {
+        player.setVideo({ ...v, subscribers: subCount.toLocaleString() })
+        player.hideMini()
+      }
       setPageLoading(false)
-      incrementViews(id).then(counted => {
-        if (!counted) return
-        setVideo(prev => {
-          if (!prev) return prev
-          const newViews = prev.views + 1
-          return { ...prev, views: newViews, viewsLabel: formatViews(newViews) }
+      if (!v.isLive) {
+        incrementViews(id).then(counted => {
+          if (!counted) return
+          setVideo(prev => {
+            if (!prev) return prev
+            const newViews = prev.views + 1
+            return { ...prev, views: newViews, viewsLabel: formatViews(newViews) }
+          })
         })
-      })
+      }
     })
-  }, [id])
+  }, [id, user?.id])
+
+  // Re-fetch user-specific data when user logs in/out (not a full page reload)
+  useEffect(() => {
+    if (!video || pageLoading) return
+    const own = !!(user && video.channelId === user.id)
+    Promise.all([
+      fetchLikes(video.id),
+      fetchDislike(video.id),
+      own ? Promise.resolve(false) : isSubscribed(video.channelId),
+    ]).then(([{ count, liked }, disliked, subbed]) => {
+      setLikeCount(count)
+      setLiked(liked)
+      setDisliked(disliked)
+      setSubscribed(subbed)
+    })
+  }, [user?.id])
 
   useEffect(() => {
-    if (!video || !containerRef.current) return
+    if (!video || video.isLive || !containerRef.current) return
     const el = player.getEl()
-    player.mountIn(containerRef.current, { controls: true })
+    el.controls = false
+    player.mountIn(containerRef.current, { controls: false })
     el.play().catch(() => {})
-    function onTimeUpdate() { player.setCurrentTime(el.currentTime) }
-    el.addEventListener('timeupdate', onTimeUpdate)
-    return () => el.removeEventListener('timeupdate', onTimeUpdate)
-  }, [video?.id])
+    // Sync custom controls state — update DOM directly, no React re-render
+    function onTimeUpdate() {
+      player.setCurrentTime(el.currentTime)
+      const bar   = vodBarRef.current
+      const label = vodTimeLabelRef.current
+      const dur   = el.duration || 0
+      if (bar) {
+        bar.value = el.currentTime
+        bar.style.setProperty('--pct', dur ? `${(el.currentTime / dur) * 100}%` : '0%')
+      }
+      if (label) label.textContent = `${formatTime(el.currentTime)} / ${formatTime(dur)}`
+    }
+    function onDurationChange() {
+      const dur = el.duration || 0
+      setVodDuration(dur)
+      if (vodBarRef.current) vodBarRef.current.max = dur
+      if (vodTimeLabelRef.current) vodTimeLabelRef.current.textContent = `0:00 / ${formatTime(dur)}`
+    }
+    function onPlayPause()      { setVodPaused(el.paused) }
+    el.addEventListener('timeupdate',     onTimeUpdate)
+    el.addEventListener('durationchange', onDurationChange)
+    el.addEventListener('play',           onPlayPause)
+    el.addEventListener('pause',          onPlayPause)
+    // Fullscreen change
+    function onFsChange() { setVodFullscreen(!!document.fullscreenElement) }
+    document.addEventListener('fullscreenchange', onFsChange)
+    // Initial state
+    setVodPaused(el.paused)
+    setVodVolume(el.volume)
+    setVodMuted(el.muted)
+    if (el.duration) setVodDuration(el.duration)
+    return () => {
+      el.removeEventListener('timeupdate',     onTimeUpdate)
+      el.removeEventListener('durationchange', onDurationChange)
+      el.removeEventListener('play',           onPlayPause)
+      el.removeEventListener('pause',          onPlayPause)
+      document.removeEventListener('fullscreenchange', onFsChange)
+    }
+  }, [video?.id, isLive])
+
+  // ── Live stream connect ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!video?.isLive) return
+    // Show loading immediately so there's no flash of empty state
+    setLiveChatLoading(true)
+    // Use a session-unique ID so returning viewers always get a fresh connection
+    const viewerId = (user?.id ?? '') + '-' + Math.random().toString(36).slice(2)
+    let conn
+
+    connectToStream(id, viewerId, {
+      onStream: (stream) => {
+        setLiveStream(stream)
+      },
+      onChatMessage: (msg) => setLiveMessages(prev => [...prev, msg]),
+      onViewerCount: setLiveViewerCount,
+      onStreamEnd: () => {
+        setStreamEnded(true)
+        // Revalidate so the video shows as ended in listings
+        fetchVideo(id).catch(() => {})
+      },
+    }).then(async c => {
+      conn = c
+      liveConnectionRef.current = c
+      // Load chat history from DB so late-joining viewers see previous messages
+      try {
+        const history = await fetchLiveChatMessages(id)
+        if (history.length > 0) setLiveMessages(history)
+      } catch {}
+      setLiveChatLoading(false)
+    })
+
+    return () => { conn?.cleanup() }
+  }, [video?.id, video?.isLive])
+  // ── Live chat scroll ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (liveChatMessagesRef.current) {
+      liveChatMessagesRef.current.scrollTop = liveChatMessagesRef.current.scrollHeight
+    }
+  }, [liveMessages])
+
+  function handleLiveChatSubmit(e) {
+    e.preventDefault()
+    if (!liveChatInput.trim() || !liveConnectionRef.current) return
+    const msg = {
+      author: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Viewer',
+      body: liveChatInput.trim(),
+      ts: Date.now(),
+    }
+    liveConnectionRef.current.sendChat(msg)
+    setLiveMessages(prev => [...prev, msg])
+    setLiveChatInput('')
+  }
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [saved,         setSaved]         = useState(false)
@@ -117,11 +294,14 @@ export default function WatchPage() {
     if (subscribed) {
       await unsubscribe(video.channelId)
       setSubscribed(false)
+      setVideo(v => v ? { ...v, subscribers: Math.max(0, parseInt(v.subscribers) - 1).toLocaleString() } : v)
     } else {
       await subscribe(video.channelId, video.channel, video.avatar)
       setSubscribed(true)
+      setVideo(v => v ? { ...v, subscribers: (parseInt(v.subscribers || '0') + 1).toLocaleString() } : v)
     }
     setSubLoading(false)
+    window.dispatchEvent(new CustomEvent('velora:subs-changed'))
   }
 
   // ── Video likes ───────────────────────────────────────────────────────────
@@ -134,6 +314,7 @@ export default function WatchPage() {
 
 
   async function handleLike() {
+    if (!user) { openAuthModal(); return }
     if (likeLoading) return
     setLikeLoading(true)
     const nowLiked = await toggleLike(video.id, liked)
@@ -144,6 +325,7 @@ export default function WatchPage() {
   }
 
   async function handleDislike() {
+    if (!user) { openAuthModal(); return }
     if (dislikeLoading) return
     setDislikeLoading(true)
     const nowDisliked = await toggleDislike(video.id, disliked)
@@ -246,6 +428,7 @@ export default function WatchPage() {
 
   async function handleSubmitComment(e) {
     e.preventDefault()
+    if (!user) { openAuthModal(); return }
     if (!commentText.trim() || submitting) return
     setSubmitting(true)
     try {
@@ -256,6 +439,7 @@ export default function WatchPage() {
   }
 
   async function handleCommentVote(commentId, vote, currentVote) {
+    if (!user) { openAuthModal(); return }
     const newVote = await voteComment(commentId, vote, currentVote)
     setComments(prev => prev.map(c =>
       c.id === commentId ? applyVoteChange(c, vote, currentVote, newVote) : c
@@ -263,6 +447,7 @@ export default function WatchPage() {
   }
 
   async function handleReplyVote(threadId, replyId, vote, currentVote) {
+    if (!user) { openAuthModal(); return }
     const newVote = await voteComment(replyId, vote, currentVote)
     setRepliesMap(prev => ({
       ...prev,
@@ -285,6 +470,7 @@ export default function WatchPage() {
 
   async function handleSubmitReply(e, threadId, parentId) {
     e.preventDefault()
+    if (!user) { openAuthModal(); return }
     if (!replyText.trim() || submittingReply) return
     setSubmittingReply(true)
     try {
@@ -302,6 +488,7 @@ export default function WatchPage() {
   }
 
   function openReply(threadId, parentId, prefix = '') {
+    if (!user) { openAuthModal(); return }
     const alreadyOpen = replyingTo?.threadId === threadId && replyingTo?.parentId === parentId
     if (alreadyOpen && !prefix) {
       setReplyingTo(null)
@@ -319,7 +506,7 @@ export default function WatchPage() {
     return (
       <div className={styles.page}>
         <div className={styles.main}>
-          <div className={`${styles.playerWrap} ${styles.skel}`} />
+          <div className={`${styles.skelVideoWrap} ${styles.skel}`} />
           <div className={styles.skelMeta}>
             <div className={`${styles.skel} ${styles.skelLine} ${styles.skelTitle}`} />
             <div className={styles.skelRow}>
@@ -353,7 +540,7 @@ export default function WatchPage() {
     )
   }
 
-  const composeAvatar = user?.user_metadata?.avatar_url || 'https://i.pravatar.cc/36?img=33'
+  const composeAvatar = getAvatarUrl(user)
 
   // Recursive reply tree renderer — depth=0 uses repliesListTop (aligns with parent avatar line)
   function renderReplies(allReplies, parentId, threadId, depth = 0) {
@@ -366,7 +553,7 @@ export default function WatchPage() {
           <div key={r.id}>
             <div className={styles.reply}>
               <img
-                src={r.avatar || 'https://i.pravatar.cc/28?img=2'}
+                src={r.avatar || `https://api.dicebear.com/9.x/lorelei/svg?seed=${r.author}`}
                 alt={r.author}
                 className={styles.rAvatar}
               />
@@ -435,6 +622,113 @@ export default function WatchPage() {
     )
   }
 
+  // ── VOD player helpers ──────────────────────────────────────────────────
+  function vodRevealControls() {
+    setVodShowCtrl(true)
+    clearTimeout(vodHideTimer.current)
+    vodHideTimer.current = setTimeout(() => setVodShowCtrl(false), 3000)
+  }
+  function formatTime(s) {
+    if (!s || isNaN(s)) return '0:00'
+    const m   = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+  function vodTogglePlay() {
+    const el = player.getEl()
+    if (!el) return
+    if (el.paused) { el.play().catch(() => {}); setVodPaused(false) }
+    else           { el.pause();                setVodPaused(true) }
+  }
+  function vodToggleMute() {
+    const el = player.getEl()
+    if (!el) return
+    el.muted = !vodMuted
+    setVodMuted(!vodMuted)
+  }
+  function vodChangeVolume(e) {
+    const v = parseFloat(e.target.value)
+    const el = player.getEl()
+    if (el) { el.volume = v; el.muted = v === 0 }
+    setVodVolume(v)
+    setVodMuted(v === 0)
+  }
+  function vodSeek(e) {
+    const el = player.getEl()
+    if (!el) return
+    el.currentTime = parseFloat(e.target.value)
+  }
+  function vodChangeSpeed(s) {
+    const el = player.getEl()
+    if (el) el.playbackRate = s
+    setVodSpeed(s)
+    setVodSettingsOpen(false)
+  }
+  function vodToggleFullscreen() {
+    if (!document.fullscreenElement) playerOuterRef.current?.requestFullscreen()
+    else document.exitFullscreen()
+  }
+  function VodVolumeIcon() {
+    if (vodMuted || vodVolume === 0) return <VolumeX size={18} />
+    if (vodVolume < 0.5)             return <Volume1 size={18} />
+    return                                  <Volume2 size={18} />
+  }
+
+  // VOD scrubber hover preview
+  function vodBarHover(e) {
+    const bar = vodBarRef.current
+    const dur = parseFloat(bar?.max) || 0
+    if (!bar || !dur) return
+    const rect = bar.getBoundingClientRect()
+    const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const time = pct * dur
+    setVodPreview(p => ({ ...(p || {}), x: e.clientX - rect.left, time, frame: p?.frame ?? null }))
+
+    clearTimeout(vodPreviewTimer.current)
+    vodPreviewTimer.current = setTimeout(() => {
+      const el = player.getEl()
+      if (!el?.src) return
+
+      // Lazily create ONE persistent clone element
+      if (!vodPreviewCloneRef.current) {
+        const v = document.createElement('video')
+        v.crossOrigin = 'anonymous'
+        v.muted       = true
+        v.preload     = 'metadata'
+        vodPreviewCloneRef.current = v
+      }
+      const clone = vodPreviewCloneRef.current
+
+      // Re-load only when the src changes
+      if (clone.dataset.loadedSrc !== el.src) {
+        clone.dataset.loadedSrc = el.src
+        clone.src = el.src
+      }
+
+      function doSeek() {
+        clone.onseeked = () => {
+          try {
+            const c = document.createElement('canvas')
+            c.width = 160; c.height = 90
+            c.getContext('2d').drawImage(clone, 0, 0, 160, 90)
+            setVodPreview(p => p ? { ...p, frame: c.toDataURL('image/jpeg', 0.7) } : null)
+          } catch { /* CORS taint — show label only */ }
+        }
+        clone.currentTime = time
+      }
+
+      if (clone.readyState >= 1) { // HAVE_METADATA
+        doSeek()
+      } else {
+        clone.onloadedmetadata = () => { clone.onloadedmetadata = null; doSeek() }
+      }
+    }, 120)
+  }
+  function vodBarLeave() {
+    clearTimeout(vodPreviewTimer.current)
+    setVodPreview(null)
+  }
+
   return (
     <div className={styles.page}>
 
@@ -442,7 +736,108 @@ export default function WatchPage() {
       <div className={styles.main}>
 
         {/* Player */}
-        <div ref={containerRef} className={styles.playerWrap} />
+        {isLive ? (
+          <LivePlayer
+            stream={liveStream}
+            viewerCount={liveViewerCount}
+            streamEnded={streamEnded}
+          />
+        ) : (
+          <div
+            ref={playerOuterRef}
+            className={styles.playerOuter}
+            onMouseMove={vodRevealControls}
+            onMouseLeave={() => { clearTimeout(vodHideTimer.current); setVodShowCtrl(false) }}
+          >
+            <div ref={containerRef} className={styles.playerWrap} />
+            <div className={`${styles.vodControls} ${vodShowCtrl ? styles.vodControlsVisible : ''}`}>
+              {/* Progress bar */}
+              <div
+                className={styles.vodScrubRow}
+                onMouseMove={vodBarHover}
+                onMouseLeave={vodBarLeave}
+              >
+<input
+                  ref={vodBarRef}
+                  type="range"
+                  min={0}
+                  max={vodDuration || 100}
+                  step={0.1}
+                  defaultValue={0}
+                  onChange={vodSeek}
+                  className={styles.vodBar}
+                />
+                {/* Hover preview tooltip */}
+                {vodPreview && (
+                  <div
+                    className={styles.vodPreviewTooltip}
+                    style={{ left: `clamp(80px, ${vodPreview.x}px, calc(100% - 80px))` }}
+                  >
+                    {vodPreview.frame
+                      ? <img src={vodPreview.frame} className={styles.vodPreviewThumb} alt="" />
+                      : <div className={styles.vodPreviewThumbBlank} />
+                    }
+                    <span className={styles.vodPreviewLabel}>{formatTime(vodPreview.time)}</span>
+                  </div>
+                )}
+              </div>
+              {/* Buttons */}
+              <div className={styles.vodBtnRow}>
+                <div className={styles.vodLeft}>
+                  <button className={styles.vodBtn} onClick={vodTogglePlay} title={vodPaused ? 'Play' : 'Pause'}>
+                    {vodPaused ? <Play size={18} fill="white" /> : <Pause size={18} fill="white" />}
+                  </button>
+                  <div
+                    className={styles.vodVolGroup}
+                    onMouseEnter={() => setVodShowVol(true)}
+                    onMouseLeave={() => setVodShowVol(false)}
+                  >
+                    <button className={styles.vodBtn} onClick={vodToggleMute} title={vodMuted ? 'Unmute' : 'Mute'}>
+                      <VodVolumeIcon />
+                    </button>
+                    <div className={`${styles.vodVolSliderWrap} ${vodShowVol ? styles.vodVolSliderVisible : ''}`}>
+                      <input
+                        type="range" min={0} max={1} step={0.02}
+                        value={vodMuted ? 0 : vodVolume}
+                        onChange={vodChangeVolume}
+                        className={styles.vodVolSlider}
+                      />
+                    </div>
+                  </div>
+                  <span ref={vodTimeLabelRef} className={styles.vodTime}>0:00 / 0:00</span>
+                </div>
+                <div className={styles.vodRight}>
+                  <div className={styles.vodSettingsWrap}>
+                    <button
+                      className={styles.vodBtn}
+                      onClick={() => setVodSettingsOpen(s => !s)}
+                      title="Settings"
+                    >
+                      <Settings size={17} />
+                    </button>
+                    {vodSettingsOpen && (
+                      <div className={styles.vodSettingsMenu} onMouseLeave={() => setVodSettingsOpen(false)}>
+                        <p className={styles.vodSettingsLabel}>Speed</p>
+                        {[0.5, 1, 1.25, 1.5, 2].map(s => (
+                          <button
+                            key={s}
+                            className={`${styles.vodSettingsItem} ${vodSpeed === s ? styles.vodSettingsItemActive : ''}`}
+                            onClick={() => vodChangeSpeed(s)}
+                          >
+                            {s === 1 ? 'Normal' : `${s}×`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button className={styles.vodBtn} onClick={vodToggleFullscreen} title={vodFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+                    {vodFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Title + meta */}
         <div className={styles.meta}>
@@ -555,7 +950,7 @@ export default function WatchPage() {
         </div>
 
         {/* Comments */}
-        <div className={styles.comments}>
+        {!isLive && <div className={styles.comments}>
           <h3 className={styles.commentsTitle}>
             {commentsLoading
               ? 'Comments'
@@ -568,9 +963,11 @@ export default function WatchPage() {
             <div className={styles.composeBox}>
               <input
                 className={styles.composeInput}
-                placeholder="Add a comment..."
+                placeholder={user ? 'Add a comment...' : 'Sign in to comment...'}
                 value={commentText}
                 onChange={e => setCommentText(e.target.value)}
+                onFocus={!user ? openAuthModal : undefined}
+                readOnly={!user}
               />
               {commentText.trim() && (
                 <button type="submit" className={styles.sendBtn} disabled={submitting}>
@@ -595,7 +992,7 @@ export default function WatchPage() {
                   <div key={c.id} className={styles.comment}>
                     <div className={styles.cAvatarCol}>
                       <img
-                        src={c.avatar || 'https://i.pravatar.cc/36?img=1'}
+                        src={c.avatar || `https://api.dicebear.com/9.x/lorelei/svg?seed=${c.author}`}
                         alt={c.author}
                         className={styles.cAvatar}
                       />
@@ -683,14 +1080,74 @@ export default function WatchPage() {
             )}
           </div>
         </div>
+        }
+
       </div>
 
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
-        <p className={styles.upNext}>Up Next</p>
-        <div className={styles.relatedList}>
-          {related.map(v => <VideoCard key={v.id} video={v} />)}
-        </div>
+        {isLive ? (
+          <div className={styles.liveChatPanel}>
+            <div className={styles.liveChatPanelHeader}>
+              <div className={styles.liveChatPanelTitle}>
+                <Radio size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
+                Live Chat
+              </div>
+              {liveViewerCount > 0 && <span className={styles.liveChatViewers}><Users size={11} style={{display:'inline', marginRight:4}} />{liveViewerCount} watching</span>}
+            </div>
+            <div ref={liveChatMessagesRef} className={styles.liveChatMessages}>
+              {liveChatLoading ? (
+                <div className={styles.liveChatEmpty}>
+                  <Loader2 size={20} className={styles.spin} />
+                  <p>Loading chat…</p>
+                </div>
+              ) : liveMessages.length === 0 ? (
+                <div className={styles.liveChatEmpty}>
+                  <p>Chat will appear here once someone sends a message…</p>
+                </div>
+              ) : null}
+              {liveMessages.map((m, i) => (
+                <div key={i} className={styles.liveChatMsg}>
+                  <img
+                    src={m.avatar || `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(m.author)}`}
+                    alt={m.author}
+                    className={styles.liveChatAvatar}
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className={styles.liveChatContent}>
+                    <span className={styles.liveChatAuthor}>{m.author}</span>
+                    {m.isHost && <span className={styles.liveChatHostBadge}>Host</span>}
+                    <span className={styles.liveChatBody}>{m.body}</span>
+                  </div>
+                </div>
+              ))}
+              <div ref={liveChatEndRef} />
+            </div>
+            {user ? (
+              <form className={styles.liveChatForm} onSubmit={handleLiveChatSubmit}>
+                <input
+                  className={styles.liveChatInput}
+                  placeholder="Say something…"
+                  value={liveChatInput}
+                  onChange={e => setLiveChatInput(e.target.value)}
+                  maxLength={200}
+                />
+                <button type="submit" className={styles.liveChatSendBtn} disabled={!liveChatInput.trim()}>
+                  <Send size={14} />
+                </button>
+              </form>
+            ) : (
+              <p className={styles.liveChatSignIn}>Sign in to chat</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className={styles.upNext}>Up Next</p>
+            <div className={styles.relatedList}>
+              {related.map(v => <VideoCard key={v.id} video={v} />)}
+            </div>
+          </>
+        )}
       </aside>
 
     </div>

@@ -44,7 +44,7 @@ export default function AiDigest({ videos = [] }) {
       <div className={styles.bar}>
         <div className={styles.barLeft}>
           <div className={styles.botIcon}><Bot size={13} /></div>
-          <span className={styles.barLabel}>{getGreeting()} — AI Daily Brief</span>
+          <span className={styles.barLabel}>{getGreeting()} — Nova Daily Brief</span>
         </div>
         <div className={styles.barRight}>
           <button className={styles.surpriseBtn} onClick={handleSurprise}>
@@ -63,7 +63,7 @@ export default function AiDigest({ videos = [] }) {
           {/* Surprise pick */}
           {pick && (
             <div className={styles.pickSection}>
-              <p className={styles.pickHeading}><Zap size={12} /> AI Pick for you right now</p>
+              <p className={styles.pickHeading}><Zap size={12} /> Nova Pick for you right now</p>
               <div className={styles.pickCard} onClick={() => navigate(`/watch/${pick.video.id}`)}>
                 <img src={pick.video.thumbnail} alt={pick.video.title} className={styles.pickThumb} />
                 <div className={styles.pickInfo}>
@@ -78,7 +78,7 @@ export default function AiDigest({ videos = [] }) {
 
           {/* Insights */}
           <div className={styles.insights}>
-            <p className={styles.insightsLabel}>Trending on Wavr right now</p>
+            <p className={styles.insightsLabel}>Trending on Velora right now</p>
             <div className={styles.insightGrid}>
               {insights.map((ins, i) => (
                 <div key={i} className={styles.insight}>

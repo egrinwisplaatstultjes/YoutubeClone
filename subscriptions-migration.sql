@@ -2,12 +2,12 @@
 
 create table if not exists subscriptions (
   id         uuid primary key default gen_random_uuid(),
-  session_id text not null,
+  user_id    text not null,
   channel_id text not null,
   channel_name   text not null default '',
   channel_avatar text not null default '',
   created_at timestamptz default now(),
-  unique (session_id, channel_id)
+  unique (user_id, channel_id)
 );
 
 -- Allow anyone to read/write their own session subscriptions

@@ -1,14 +1,10 @@
 import { supabase } from './supabase'
-import { mapVideo } from './utils'
+import { mapVideo, getAvatarUrl } from './utils'
 
-// ── Session ID ────────────────────────────────────────────────────────────────
-export function getSessionId() {
-  let id = localStorage.getItem('wavr_session')
-  if (!id) {
-    id = crypto.randomUUID()
-    localStorage.setItem('wavr_session', id)
-  }
-  return id
+// ── Auth user ID helper ───────────────────────────────────────────────────────
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
 }
 
 // ── Videos ────────────────────────────────────────────────────────────────────
@@ -24,6 +20,7 @@ export async function fetchVideos() {
   const { data, error } = await supabase
     .from('videos')
     .select('*')
+    .eq('is_short', false)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -124,12 +121,12 @@ export async function fetchVideo(id) {
   return mapVideo(data)
 }
 
-export async function createVideo({ title, description, category, tags, thumbnail, videoUrl, duration }) {
+export async function createVideo({ title, description, category, tags, thumbnail, videoUrl, duration, durationSeconds, isShort = false }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('You must be signed in to upload a video.')
 
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Your Channel'
-  const avatar      = user.user_metadata?.avatar_url || 'https://i.pravatar.cc/40?img=33'
+  const avatar      = getAvatarUrl(user)
 
   const id = crypto.randomUUID()
   const { data, error } = await supabase
@@ -141,8 +138,82 @@ export async function createVideo({ title, description, category, tags, thumbnai
       category,
       tags,
       thumbnail,
-      video_url:   videoUrl,
+      video_url:        videoUrl,
       duration,
+      duration_seconds: durationSeconds ?? null,
+      channel:          displayName,
+      channel_id:       user.id,
+      avatar,
+      views:            0,
+      subscribers:      '0',
+      verified:         false,
+      user_id:          user.id,
+      is_short:         isShort,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  invalidateVideosCache()
+  return mapVideo(data)
+}
+
+export async function fetchShorts() {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('is_short', true)
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(mapVideo)
+}
+
+// Fetch a single short by ID (used when navigating from homepage)
+export async function fetchShortById(id) {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('id', id)
+    .eq('is_short', true)
+    .single()
+  if (error) throw error
+  return mapVideo(data)
+}
+
+// Fetch a page of shorts, optionally starting after a cursor and excluding seen IDs
+export async function fetchShortsPage({ limit = 5, beforeDate = null, excludeIds = [] } = {}) {
+  let query = supabase
+    .from('videos')
+    .select('*')
+    .eq('is_short', true)
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (beforeDate) query = query.lt('created_at', beforeDate)
+  if (excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`)
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map(mapVideo)
+}
+
+export async function createLiveStream({ title, description, category, thumbnail = null }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('You must be signed in to go live.')
+
+  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Your Channel'
+  const avatar      = getAvatarUrl(user)
+
+  const id = crypto.randomUUID()
+  const { data, error } = await supabase
+    .from('videos')
+    .insert({
+      id,
+      title,
+      description,
+      category,
+      thumbnail,
+      video_url:   null,
+      duration:    'LIVE',
       channel:     displayName,
       channel_id:  user.id,
       avatar,
@@ -150,11 +221,61 @@ export async function createVideo({ title, description, category, tags, thumbnai
       subscribers: '0',
       verified:    false,
       user_id:     user.id,
+      is_live:     true,
     })
     .select()
     .single()
   if (error) throw error
+  invalidateVideosCache()
   return mapVideo(data)
+}
+
+export async function endLiveStream(id) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not signed in.')
+  const { error } = await supabase
+    .from('videos')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+  if (error) throw error
+  invalidateVideosCache()
+}
+
+export async function fetchLiveChannelIds() {
+  const { data } = await supabase
+    .from('videos')
+    .select('channel_id')
+    .eq('is_live', true)
+  return new Set((data ?? []).map(r => r.channel_id))
+}
+
+// ── Live chat messages ────────────────────────────────────────────────────────
+
+export async function insertLiveChatMessage(videoId, msg) {
+  await supabase.from('live_messages').insert({
+    video_id: videoId,
+    author:   msg.author,
+    avatar:   msg.avatar ?? null,
+    body:     msg.body,
+    is_host:  msg.isHost ?? false,
+  })
+}
+
+export async function fetchLiveChatMessages(videoId) {
+  const { data } = await supabase
+    .from('live_messages')
+    .select('*')
+    .eq('video_id', videoId)
+    .order('created_at', { ascending: true })
+    .limit(300)
+  return (data ?? []).map(r => ({
+    author: r.author,
+    avatar: r.avatar,
+    body:   r.body,
+    isHost: r.is_host,
+    ts:     new Date(r.created_at).getTime(),
+  }))
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -183,70 +304,79 @@ export async function uploadFile(path, file, onProgress) {
 // ── Subscriptions ─────────────────────────────────────────────────────────
 
 export async function fetchSubscriptions() {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) return []
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
-    .eq('session_id', sessionId)
+    .eq('user_id', userId)
     .order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
 
 export async function isSubscribed(channelId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) return false
   const { data } = await supabase
     .from('subscriptions')
     .select('id')
-    .eq('session_id', sessionId)
+    .eq('user_id', userId)
     .eq('channel_id', channelId)
     .maybeSingle()
   return !!data
 }
 
+export async function fetchSubscriberCount(channelId) {
+  const { count } = await supabase
+    .from('subscriptions')
+    .select('*', { count: 'exact', head: true })
+    .eq('channel_id', channelId)
+  return count ?? 0
+}
+
 export async function subscribe(channelId, channelName, channelAvatar) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   await supabase.from('subscriptions').upsert(
-    { session_id: sessionId, channel_id: channelId, channel_name: channelName, channel_avatar: channelAvatar },
-    { onConflict: 'session_id,channel_id' }
+    { user_id: userId, channel_id: channelId, channel_name: channelName, channel_avatar: channelAvatar },
+    { onConflict: 'user_id,channel_id' }
   )
 }
 
 export async function unsubscribe(channelId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   await supabase.from('subscriptions')
     .delete()
-    .eq('session_id', sessionId)
+    .eq('user_id', userId)
     .eq('channel_id', channelId)
 }
 
 // ── Likes ─────────────────────────────────────────────────────────────────────
 
 export async function fetchLikes(videoId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  const countQuery = supabase.from('likes').select('*', { count: 'exact', head: true }).eq('video_id', videoId)
+  if (!userId) {
+    const { count } = await countQuery
+    return { count: count ?? 0, liked: false }
+  }
   const [{ count }, { data: row }] = await Promise.all([
-    supabase
-      .from('likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('video_id', videoId),
-    supabase
-      .from('likes')
-      .select('video_id')
-      .eq('video_id', videoId)
-      .eq('session_id', sessionId)
-      .maybeSingle(),
+    countQuery,
+    supabase.from('likes').select('video_id').eq('video_id', videoId).eq('user_id', userId).maybeSingle(),
   ])
   return { count: count ?? 0, liked: !!row }
 }
 
 export async function toggleLike(videoId, currentlyLiked) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   if (currentlyLiked) {
-    await supabase.from('likes').delete()
-      .eq('video_id', videoId).eq('session_id', sessionId)
+    await supabase.from('likes').delete().eq('video_id', videoId).eq('user_id', userId)
     return false
   } else {
-    await supabase.from('likes').insert({ video_id: videoId, session_id: sessionId })
+    await supabase.from('likes').insert({ video_id: videoId, user_id: userId })
     return true
   }
 }
@@ -307,71 +437,70 @@ export async function updateVideo(id, { title, description, category, tags }) {
 // ── Reports ───────────────────────────────────────────────────────────────────
 
 export async function fetchReported(videoId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) return false
   const { data } = await supabase
-    .from('reports')
-    .select('id')
-    .eq('video_id', videoId)
-    .eq('session_id', sessionId)
+    .from('reports').select('id')
+    .eq('video_id', videoId).eq('user_id', userId)
     .maybeSingle()
   return !!data
 }
 
 export async function reportVideo(videoId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   await supabase.from('reports').upsert(
-    { video_id: videoId, session_id: sessionId },
-    { onConflict: 'video_id,session_id' }
+    { video_id: videoId, user_id: userId },
+    { onConflict: 'video_id,user_id' }
   )
 }
 
 // ── Dislikes ──────────────────────────────────────────────────────────────────
 
 export async function fetchDislike(videoId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) return false
   const { data: row } = await supabase
-    .from('dislikes')
-    .select('video_id')
-    .eq('video_id', videoId)
-    .eq('session_id', sessionId)
+    .from('dislikes').select('video_id')
+    .eq('video_id', videoId).eq('user_id', userId)
     .maybeSingle()
   return !!row
 }
 
 export async function toggleDislike(videoId, currentlyDisliked) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   if (currentlyDisliked) {
-    await supabase.from('dislikes').delete()
-      .eq('video_id', videoId).eq('session_id', sessionId)
+    await supabase.from('dislikes').delete().eq('video_id', videoId).eq('user_id', userId)
     return false
   } else {
-    await supabase.from('dislikes').insert({ video_id: videoId, session_id: sessionId })
+    await supabase.from('dislikes').insert({ video_id: videoId, user_id: userId })
     return true
   }
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────
 
-function enrichComment(c, sessionId) {
+function enrichComment(c, userId) {
   const votes     = c.comment_votes ?? []
   const upCount   = votes.filter(v => v.vote === 'up').length
   const downCount = votes.filter(v => v.vote === 'down').length
-  const userVote  = votes.find(v => v.session_id === sessionId)?.vote ?? null
+  const userVote  = userId ? (votes.find(v => v.user_id === userId)?.vote ?? null) : null
   const { comment_votes: _cv, ...rest } = c
   return { ...rest, upCount, downCount, userVote }
 }
 
 export async function fetchComments(videoId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
   const { data, error } = await supabase
     .from('comments')
-    .select('*, comment_votes(vote, session_id)')
+    .select('*, comment_votes(vote, user_id)')
     .eq('video_id', videoId)
     .is('parent_id', null)
     .order('created_at', { ascending: false })
   if (error) throw error
 
-  const enriched = (data ?? []).map(c => enrichComment(c, sessionId))
+  const enriched = (data ?? []).map(c => enrichComment(c, userId))
   if (enriched.length === 0) return enriched
 
   // Fetch reply counts for all top-level comments
@@ -386,17 +515,17 @@ export async function fetchComments(videoId) {
 }
 
 export async function fetchReplies(topLevelId) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
   const all = []
   let queue = [topLevelId]
   while (queue.length > 0) {
     const { data, error } = await supabase
       .from('comments')
-      .select('*, comment_votes(vote, session_id)')
+      .select('*, comment_votes(vote, user_id)')
       .in('parent_id', queue)
       .order('created_at', { ascending: true })
     if (error) throw error
-    const enriched = (data ?? []).map(c => enrichComment(c, sessionId))
+    const enriched = (data ?? []).map(c => enrichComment(c, userId))
     all.push(...enriched)
     queue = enriched.map(r => r.id)
   }
@@ -404,15 +533,16 @@ export async function fetchReplies(topLevelId) {
 }
 
 export async function voteComment(commentId, vote, currentVote) {
-  const sessionId = getSessionId()
+  const userId = await getUserId()
+  if (!userId) throw new Error('Not signed in.')
   if (currentVote === vote) {
     await supabase.from('comment_votes').delete()
-      .eq('comment_id', commentId).eq('session_id', sessionId)
+      .eq('comment_id', commentId).eq('user_id', userId)
     return null
   }
   await supabase.from('comment_votes').upsert(
-    { comment_id: commentId, session_id: sessionId, vote },
-    { onConflict: 'comment_id,session_id' }
+    { comment_id: commentId, user_id: userId, vote },
+    { onConflict: 'comment_id,user_id' }
   )
   return vote
 }
@@ -422,7 +552,7 @@ export async function postComment(videoId, body) {
   if (!user) throw new Error('You must be signed in to comment.')
 
   const author = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Anonymous'
-  const avatar = user.user_metadata?.avatar_url || 'https://i.pravatar.cc/40?img=33'
+  const avatar = getAvatarUrl(user)
 
   const { data, error } = await supabase
     .from('comments')
@@ -438,7 +568,7 @@ export async function postReply(videoId, parentId, body) {
   if (!user) throw new Error('You must be signed in to reply.')
 
   const author = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Anonymous'
-  const avatar = user.user_metadata?.avatar_url || 'https://i.pravatar.cc/40?img=33'
+  const avatar = getAvatarUrl(user)
 
   const { data, error } = await supabase
     .from('comments')

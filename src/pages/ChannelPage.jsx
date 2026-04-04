@@ -160,7 +160,7 @@ export default function ChannelPage() {
           <div className={styles.about}>
             <div className={styles.aboutCard}>
               <h3 className={styles.aboutHeading}>About</h3>
-              <p className={styles.aboutDesc}>{channelName}'s channel on Wavr.</p>
+              <p className={styles.aboutDesc}>{channelName}'s channel on Velora.</p>
               <div className={styles.aboutStats}>
                 <div className={styles.aboutStat}>
                   <Eye size={15} /> <span>{formatViews(totalViews)} total views</span>

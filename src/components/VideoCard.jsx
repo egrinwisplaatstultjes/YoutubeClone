@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BadgeCheck, Sparkles } from 'lucide-react'
 import { useThumbColor } from '../lib/useThumbColor'
+import { useLiveViewerCount } from '../lib/useLiveViewerCount'
 import styles from './VideoCard.module.css'
 
 export default function VideoCard({ video, aiMatch, layout }) {
@@ -9,16 +10,16 @@ export default function VideoCard({ video, aiMatch, layout }) {
   const isRow     = layout === 'row'
   const thumbColor = useThumbColor(video.thumbnail)
   const [hovered, setHovered] = useState(false)
+  const liveViewers = useLiveViewerCount(isLive ? video.id : null)
 
   return (
-    <Link
-      to={`/watch/${video.id}`}
+    <div
       className={`${styles.card} ${isRow ? styles.cardRow : ''}`}
       style={{ background: hovered && thumbColor ? thumbColor : undefined }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className={`${styles.thumb} ${isRow ? styles.thumbRow : ''}`}>
+      <Link to={`/watch/${video.id}`} className={`${styles.thumb} ${isRow ? styles.thumbRow : ''}`} tabIndex={-1}>
         <img src={video.thumbnail} alt={video.title} loading="lazy" />
         <div className={styles.thumbOverlay} />
         <span className={`${styles.dur} ${isLive ? styles.live : ''}`}>
@@ -30,19 +31,28 @@ export default function VideoCard({ video, aiMatch, layout }) {
             {aiMatch.score}% match
           </div>
         )}
-      </div>
+      </Link>
 
       <div className={styles.body}>
-        <Link to={`/channel/${video.channelId}`} className={styles.avatarLink} onClick={e => e.stopPropagation()}>
+        <Link to={`/channel/${video.channelId}`} className={styles.avatarLink}>
           <img src={video.avatar} alt={video.channel} className={styles.avatar} />
         </Link>
         <div className={`${styles.info} ${isRow ? styles.bodyRow : ''}`}>
-          <h3 className={`${styles.title} ${isRow ? styles.titleRow : ''}`}>{video.title}</h3>
-          <p className={styles.channel}>
-            {video.channel}
-            {video.verified && <BadgeCheck size={12} className={styles.check} />}
+          <Link to={`/watch/${video.id}`} className={styles.titleLink}>
+            <h3 className={`${styles.title} ${isRow ? styles.titleRow : ''}`}>{video.title}</h3>
+          </Link>
+          <Link to={`/channel/${video.channelId}`} className={styles.channelLink}>
+            <p className={styles.channel}>
+              {video.channel}
+              {video.verified && <BadgeCheck size={12} className={styles.check} />}
+            </p>
+          </Link>
+          <p className={styles.meta}>
+            {isLive
+              ? `${liveViewers.toLocaleString()} watching`
+              : `${video.viewsLabel} views · ${video.timeAgo}`
+            }
           </p>
-          <p className={styles.meta}>{video.viewsLabel} views · {video.timeAgo}</p>
           {aiMatch && (
             <p className={styles.aiReason}>
               <Sparkles size={10} className={styles.aiIcon} />
@@ -51,6 +61,6 @@ export default function VideoCard({ video, aiMatch, layout }) {
           )}
         </div>
       </div>
-    </Link>
+    </div>
   )
 }

@@ -31,6 +31,16 @@ export const videos = [
   { id:'12', title:'Surfing the Biggest Waves in Portugal — Nazaré 2025',     channel:'WaveRiders',   channelId:'c12', avatar:'https://i.pravatar.cc/40?img=12', thumbnail:'https://picsum.photos/seed/v12/640/360', videoUrl: VIDEOS.v12, views:'3.4M', timeAgo:'5 days ago',   duration:'09:48',    category:'Sports',    tags:['energized','hype'],    subscribers:'2.7M', verified:true,  description:"Chasing 30-meter waves at Nazaré, the big-wave surfing capital of the world.",                                               likes:'163K', comments:6700 },
 ]
 
+export const shorts = [
+  { id:'s1', title:'This one coding trick saves you hours every week 🔥', channel:'CodeWithAlex', channelId:'c1', avatar:'https://i.pravatar.cc/40?img=1', thumbnail:'https://picsum.photos/seed/sh1/400/711', videoUrl:VIDEOS.v3, duration:'0:47', views:2100000, likes:89000, category:'Tech' },
+  { id:'s2', title:'Tokyo at 3am hits different 🌙✨', channel:'WanderLens', channelId:'c4', avatar:'https://i.pravatar.cc/40?img=4', thumbnail:'https://picsum.photos/seed/sh2/400/711', videoUrl:VIDEOS.v4, duration:'0:58', views:4800000, likes:212000, category:'Travel' },
+  { id:'s3', title:'POV: you just understood async/await 😂', channel:'CodeWithAlex', channelId:'c1', avatar:'https://i.pravatar.cc/40?img=1', thumbnail:'https://picsum.photos/seed/sh3/400/711', videoUrl:VIDEOS.v5, duration:'0:52', views:880000, likes:41000, category:'Tech' },
+  { id:'s4', title:'NBA play of the year 🏀🔥', channel:'HoopsVault', channelId:'c8', avatar:'https://i.pravatar.cc/40?img=8', thumbnail:'https://picsum.photos/seed/sh4/400/711', videoUrl:VIDEOS.v6, duration:'0:31', views:7200000, likes:340000, category:'Sports' },
+  { id:'s5', title:'5 pasta hacks chefs don\'t want you to know', channel:'KitchenMasters', channelId:'c6', avatar:'https://i.pravatar.cc/40?img=6', thumbnail:'https://picsum.photos/seed/sh5/400/711', videoUrl:VIDEOS.v7, duration:'0:55', views:3300000, likes:156000, category:'Cooking' },
+  { id:'s6', title:'Why quantum computers will break encryption 😰', channel:'CosmosUnlocked', channelId:'c5', avatar:'https://i.pravatar.cc/40?img=5', thumbnail:'https://picsum.photos/seed/sh6/400/711', videoUrl:VIDEOS.v8, duration:'0:49', views:5600000, likes:267000, category:'Science' },
+  { id:'s7', title:'Minimal desk setup for $80 total 🖥️', channel:'DesignByYou', channelId:'c9', avatar:'https://i.pravatar.cc/40?img=9', thumbnail:'https://picsum.photos/seed/sh7/400/711', videoUrl:VIDEOS.v9, duration:'0:44', views:1200000, likes:67000, category:'Education' },
+]
+
 export const comments = [
   { id:1, user:'PixelNerd42',   avatar:'https://i.pravatar.cc/32?img=11', text:"This is genuinely one of the best explanations I've seen. Keep it up!", likes:342, timeAgo:'2 days ago' },
   { id:2, user:'NightOwlCoder', avatar:'https://i.pravatar.cc/32?img=12', text:"I've been waiting for this video for so long. Worth every second.",     likes:128, timeAgo:'3 days ago' },

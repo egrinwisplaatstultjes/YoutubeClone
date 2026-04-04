@@ -1,0 +1,703 @@
+/* Suppress the document scrollbar while the shorts page is mounted */
+:global(body):has(.page) {
+  overflow: hidden;
+}
+
+/* Full-screen shorts page — sits inside <main> so sidebar margin is respected */
+.page {
+  position: relative;
+  height: calc(100vh - var(--topbar, 56px));
+  background: #0a0a0a;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Upload Short button — top right */
+.uploadBtn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s;
+}
+.uploadBtn:hover { background: rgba(255,255,255,0.22); }
+
+/* Loading / empty states */
+.loadingState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.loadMoreSpinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: rgba(255,255,255,0.4);
+}
+.spinner {
+  animation: spin 0.9s linear infinite;
+  color: rgba(255,255,255,0.5);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.emptyState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: rgba(255,255,255,0.5);
+  font-size: 15px;
+  z-index: 10;
+}
+.emptyUploadBtn {
+  padding: 9px 20px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.emptyUploadBtn:hover { background: rgba(255,255,255,0.2); }
+
+/* Snap-scroll feed — full size */
+.feed {
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.feed::-webkit-scrollbar { display: none; }
+
+/* Each snap item */
+.item {
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* Stage group — stage left, actions pinned to bottom-right */
+.stageGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+/* Portrait video stage — centered, phone-like */
+.stage {
+  position: relative;
+  height: calc(100vh - 90px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+  flex-shrink: 0;
+}
+
+/* Video fills stage */
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Bottom gradient for readability */
+.gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 55%;
+  background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 55%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Click-to-pause indicator */
+.pauseIndicator {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pauseIndicator svg {
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
+  opacity: 0.9;
+}
+
+/* Mute button — inside stage, top right */
+.muteBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s;
+}
+.muteBtn:hover { background: rgba(0,0,0,0.72); }
+
+/* Info overlay — bottom of stage */
+.overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 0 14px 16px;
+}
+
+.channelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.7);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.channelName {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  margin: 0 0 5px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+}
+
+/* Right-side actions column — outside the stage */
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.actionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.actionBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+.actionBtn:hover { background: rgba(255,255,255,0.2); transform: scale(1.08); }
+.actionBtnLiked  { color: #ff4d4d; background: rgba(255,77,77,0.18); }
+.actionBtnActive { background: rgba(255,255,255,0.25); }
+.actionBtnSaved  { color: #a78bfa; background: rgba(167,139,250,0.18); }
+
+/* ── Share popover ── */
+.sharePopover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 220px;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 50;
+  animation: panelIn 0.18s ease-out;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.shareTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+}
+
+.shareOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.shareOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  text-decoration: none;
+  color: #fff;
+  transition: background 0.15s, transform 0.12s;
+}
+.shareOption:hover {
+  background: color-mix(in srgb, var(--share-color) 20%, transparent);
+  transform: scale(1.04);
+}
+
+.shareOptionIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.shareOptionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+}
+
+.shareCopyBtn {
+  width: 100%;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.shareCopyBtn:hover { background: rgba(255,255,255,0.12); }
+.shareCopied { background: rgba(62,166,255,0.2) !important; color: #3ea6ff; border-color: #3ea6ff; }
+
+.actionLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  text-align: center;
+}
+
+/* ── Comments panel — same height as the stage ── */
+.commentsPanel {
+  /* width animates open/closed — drives the stage shift */
+  width: 380px;
+  min-width: 0;
+  height: calc(100vh - 90px);
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  /* margin-left is also animated so there's no gap when panel is closed */
+  margin-left: 24px;
+  opacity: 1;
+  transition: width 0.32s cubic-bezier(0.4,0,0.2,1),
+              margin-left 0.32s cubic-bezier(0.4,0,0.2,1),
+              opacity 0.22s ease,
+              border-color 0.22s ease;
+}
+
+/* Closed state — zero width, no margin, invisible */
+.commentsPanelClosed {
+  width: 0;
+  margin-left: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-color: transparent;
+}
+
+.commentsPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  flex-shrink: 0;
+}
+
+.commentsPanelTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.commentsPanelClose {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.commentsPanelClose:hover { background: rgba(255,255,255,0.15); }
+
+.commentsList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.commentsLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.noComments {
+  text-align: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+  padding: 32px 0;
+  margin: 0;
+}
+
+/* Thread wrapper — indent by depth */
+.thread {
+  padding-left: calc(var(--depth, 0) * 16px);
+}
+
+.comment {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.cAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.cBody { flex: 1; min-width: 0; }
+
+.cTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cUser {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.cTime {
+  font-size: 11px;
+  color: #666;
+}
+
+.cText {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.45;
+  margin: 0 0 5px;
+}
+
+.cLikes {
+  font-size: 11.5px;
+  color: #666;
+}
+
+.cActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.voteBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.05);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: color 0.15s, background 0.15s;
+}
+.voteBtn:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); }
+.voteBtnActive { color: #3ea6ff; background: rgba(62,166,255,0.12); }
+
+.replyBtn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.05);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: color 0.15s, background 0.15s;
+}
+.replyBtn:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); }
+
+.viewRepliesBtn {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #3ea6ff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+.viewRepliesBtn:hover { color: #6bbdff; }
+
+.replyCompose {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.replyInput {
+  flex: 1;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #fff;
+  outline: none;
+}
+.replyInput::placeholder { color: #555; }
+.replyInput:focus { border-color: rgba(255,255,255,0.28); }
+
+.commentCompose {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.composeAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.composeInput {
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: #fff;
+  outline: none;
+}
+.composeInput::placeholder { color: #555; }
+.composeInput:focus { border-color: rgba(255,255,255,0.28); }
+
+.composeSend {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: #3ea6ff;
+  border: none;
+  color: #000;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+}
+.composeSend:hover { background: #5ab5ff; }
+.composeSend:disabled { opacity: 0.5; cursor: default; }
+
+.commentSignIn {
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.signInBtn {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.signInBtn:hover { background: rgba(255,255,255,0.15); }
+
+/* ── Mobile (≤ 700px) ── */
+@media (max-width: 700px) {
+  .item {
+    padding: 0;
+    position: relative;
+  }
+
+  /* Stage group fills the item; actions overlay the video */
+  .stageGroup {
+    width: 100%;
+    height: 100%;
+    gap: 0;
+    position: relative;
+    align-items: stretch;
+  }
+
+  /* Video fills the entire screen */
+  .stage {
+    height: 100%;
+    max-height: 100%;
+    width: 100%;
+    aspect-ratio: unset;
+    border-radius: 0;
+    flex-shrink: 1;
+  }
+
+  /* Action buttons float inside the video — bottom-right overlay */
+  .actions {
+    position: absolute;
+    right: 12px;
+    bottom: 110px;
+    z-index: 10;
+    gap: 10px;
+    background: transparent;
+  }
+
+  /* Slightly smaller buttons on mobile */
+  .actionBtn {
+    width: 42px;
+    height: 42px;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  /* Action labels always visible on mobile (they're part of the overlay) */
+  .actionLabel {
+    color: rgba(255,255,255,0.9);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+
+  /* Upload button moves up slightly to not overlap actions */
+  .uploadBtn {
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  /* Comments slide up from the bottom as a sheet */
+  .commentsPanel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    height: 65%;
+    border-radius: 18px 18px 0 0;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-left: 0 !important;
+    align-self: unset;
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.25s ease;
+  }
+
+  .commentsPanelClosed {
+    width: 100% !important;
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+}

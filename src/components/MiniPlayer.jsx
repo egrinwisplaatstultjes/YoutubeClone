@@ -5,7 +5,7 @@ import { usePlayer } from '../context/PlayerContext'
 import styles from './MiniPlayer.module.css'
 
 export default function MiniPlayer() {
-  const { video, miniVisible, dismiss, getEl, mountIn, detach } = usePlayer()
+  const { video, miniVisible, dismiss, getEl, mountIn, detach, userPaused } = usePlayer()
   const navigate     = useNavigate()
   const containerRef = useRef(null)
   const [playing, setPlaying] = useState(false)
@@ -15,7 +15,7 @@ export default function MiniPlayer() {
     if (!miniVisible || !containerRef.current) return
     const el = getEl()
     mountIn(containerRef.current)
-    el.play().catch(() => {})
+    if (!userPaused.current) el.play().catch(() => {})
 
     function onPlay()  { setPlaying(true)  }
     function onPause() { setPlaying(false) }
